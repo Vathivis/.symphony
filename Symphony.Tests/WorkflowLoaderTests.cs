@@ -4,18 +4,19 @@ namespace Symphony.Tests;
 
 public sealed class WorkflowLoaderTests {
 	[Fact]
-	public void Load_ParsesFrontMatter_UsesDefaults_AndFallsBackToCanonicalLinearApiKey() {
+	public void Load_ParsesFrontMatter_UsesDefaults_AndFallsBackToCanonicalLinearSettings() {
 		var originalApiKey = Environment.GetEnvironmentVariable("LINEAR_API_KEY");
+		var originalProjectSlug = Environment.GetEnvironmentVariable("LINEAR_PROJECT_SLUG");
 		var workflowDirectory = Directory.CreateTempSubdirectory();
 		var workflowPath = Path.Combine(workflowDirectory.FullName, "WORKFLOW.md");
 
 		try {
 			Environment.SetEnvironmentVariable("LINEAR_API_KEY", "test-linear-api-key");
+			Environment.SetEnvironmentVariable("LINEAR_PROJECT_SLUG", "test-project-slug");
 			File.WriteAllText(workflowPath, """
 				---
 				tracker:
 				  kind: linear
-				  project_slug: demo-project
 				agent:
 				  max_turns: 5
 				---
@@ -27,12 +28,13 @@ public sealed class WorkflowLoaderTests {
 
 			Assert.True(workflow.Validation.IsValid);
 			Assert.Equal("test-linear-api-key", workflow.Config.Tracker.ApiKey);
-			Assert.Equal("demo-project", workflow.Config.Tracker.ProjectSlug);
+			Assert.Equal("test-project-slug", workflow.Config.Tracker.ProjectSlug);
 			Assert.Equal(5, workflow.Config.Agent.MaxTurns);
 			Assert.Contains("Todo", workflow.Config.Tracker.ActiveStates);
 			Assert.Equal("Hello {{ issue.identifier }}", workflow.Definition.PromptTemplate);
 		} finally {
 			Environment.SetEnvironmentVariable("LINEAR_API_KEY", originalApiKey);
+			Environment.SetEnvironmentVariable("LINEAR_PROJECT_SLUG", originalProjectSlug);
 			workflowDirectory.Delete(recursive: true);
 		}
 	}

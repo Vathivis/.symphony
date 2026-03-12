@@ -3,7 +3,7 @@ tracker:
   kind: linear
   endpoint: https://api.linear.app/graphql
   api_key: $LINEAR_API_KEY
-  project_slug: b1916cca5a7a
+  project_slug: $LINEAR_PROJECT_SLUG
   active_states:
     - Todo
     - In Progress

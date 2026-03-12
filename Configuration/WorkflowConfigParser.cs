@@ -20,8 +20,8 @@ public static class WorkflowConfigParser {
 
 		var trackerKind = GetString(tracker, "kind") ?? "linear";
 		var endpoint = GetString(tracker, "endpoint") ?? "https://api.linear.app/graphql";
-		var apiKey = ResolveSecret(GetString(tracker, "api_key"), "LINEAR_API_KEY");
-		var projectSlug = GetString(tracker, "project_slug");
+		var apiKey = ResolveConfiguredValue(GetString(tracker, "api_key"), "LINEAR_API_KEY");
+		var projectSlug = ResolveConfiguredValue(GetString(tracker, "project_slug"), "LINEAR_PROJECT_SLUG");
 		var activeStates = ReadStringList(tracker, "active_states", DefaultActiveStates);
 		var terminalStates = ReadStringList(tracker, "terminal_states", DefaultTerminalStates);
 
@@ -208,7 +208,7 @@ public static class WorkflowConfigParser {
 		return Path.Combine(Path.GetTempPath(), "symphony_workspaces");
 	}
 
-	private static string? ResolveSecret(string? configuredValue, string canonicalEnvironmentVariable) {
+	private static string? ResolveConfiguredValue(string? configuredValue, string canonicalEnvironmentVariable) {
 		if (string.IsNullOrWhiteSpace(configuredValue)) {
 			return EmptyAsNull(Environment.GetEnvironmentVariable(canonicalEnvironmentVariable));
 		}
