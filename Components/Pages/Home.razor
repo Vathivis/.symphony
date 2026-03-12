@@ -1,0 +1,173 @@
+@page "/"
+@implements IDisposable
+@inject Symphony.Orchestration.SymphonyOrchestrator Orchestrator
+
+<PageTitle>Symphony</PageTitle>
+
+@if (_snapshot is null)
+{
+	<p>Loading current Symphony state...</p>
+}
+else
+{
+	<section class="dashboard-shell">
+		<header class="dashboard-header">
+			<div>
+				<p class="eyebrow">Symphony Runtime</p>
+				<h1>Agent Orchestration Dashboard</h1>
+				<p class="lede">Workflow: @_snapshot.WorkflowPath</p>
+				<p class="lede">Last workflow reload: @_snapshot.WorkflowLoadedAt.ToLocalTime().ToString("u")</p>
+				@if (!string.IsNullOrWhiteSpace(_snapshot.LastReloadError))
+				{
+					<p class="error-text">Last reload error: @_snapshot.LastReloadError</p>
+				}
+			</div>
+			<button class="refresh-button" @onclick="RefreshNowAsync">Refresh</button>
+		</header>
+
+		<section class="summary-grid">
+			<article class="summary-card">
+				<span class="summary-label">Running</span>
+				<strong>@_snapshot.Counts.Running</strong>
+			</article>
+			<article class="summary-card">
+				<span class="summary-label">Retrying</span>
+				<strong>@_snapshot.Counts.Retrying</strong>
+			</article>
+			<article class="summary-card">
+				<span class="summary-label">Input Tokens</span>
+				<strong>@_snapshot.CodexTotals.InputTokens</strong>
+			</article>
+			<article class="summary-card">
+				<span class="summary-label">Output Tokens</span>
+				<strong>@_snapshot.CodexTotals.OutputTokens</strong>
+			</article>
+			<article class="summary-card">
+				<span class="summary-label">Total Tokens</span>
+				<strong>@_snapshot.CodexTotals.TotalTokens</strong>
+			</article>
+			<article class="summary-card">
+				<span class="summary-label">Runtime Seconds</span>
+				<strong>@_snapshot.CodexTotals.SecondsRunning.ToString("F1")</strong>
+			</article>
+		</section>
+
+		<section class="data-section">
+			<h2>Running Sessions</h2>
+			@if (_snapshot.Running.Count == 0)
+			{
+				<p>No active sessions.</p>
+			}
+			else
+			{
+				<table class="data-table">
+					<thead>
+						<tr>
+							<th>Issue</th>
+							<th>State</th>
+							<th>Session</th>
+							<th>Turns</th>
+							<th>Last Event</th>
+							<th>Last Message</th>
+						</tr>
+					</thead>
+					<tbody>
+						@foreach (var running in _snapshot.Running)
+						{
+							<tr>
+								<td>@running.IssueIdentifier</td>
+								<td>@running.State</td>
+								<td>@running.SessionId</td>
+								<td>@running.TurnCount</td>
+								<td>@running.LastEvent</td>
+								<td>@running.LastMessage</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			}
+		</section>
+
+		<section class="data-section">
+			<h2>Retry Queue</h2>
+			@if (_snapshot.Retrying.Count == 0)
+			{
+				<p>No retries queued.</p>
+			}
+			else
+			{
+				<table class="data-table">
+					<thead>
+						<tr>
+							<th>Issue</th>
+							<th>Attempt</th>
+							<th>Due At</th>
+							<th>Error</th>
+						</tr>
+					</thead>
+					<tbody>
+						@foreach (var retry in _snapshot.Retrying)
+						{
+							<tr>
+								<td>@retry.IssueIdentifier</td>
+								<td>@retry.Attempt</td>
+								<td>@retry.DueAt.ToLocalTime().ToString("u")</td>
+								<td>@retry.Error</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			}
+		</section>
+
+		<section class="data-section">
+			<h2>Rate Limits</h2>
+			@if (_snapshot.RateLimits is null)
+			{
+				<p>No rate-limit snapshot reported yet.</p>
+			}
+			else
+			{
+				<pre class="json-block">@_snapshot.RateLimits.ToJsonString(new() { WriteIndented = true })</pre>
+			}
+		</section>
+	</section>
+}
+
+@code {
+	private System.Threading.PeriodicTimer? _timer;
+	private Symphony.Domain.RuntimeSnapshot? _snapshot;
+
+	protected override void OnInitialized()
+	{
+		_snapshot = Orchestrator.GetSnapshot();
+		_timer = new System.Threading.PeriodicTimer(TimeSpan.FromSeconds(5));
+		_ = RefreshLoopAsync();
+	}
+
+	public void Dispose()
+	{
+		_timer?.Dispose();
+	}
+
+	private async Task RefreshNowAsync()
+	{
+		Orchestrator.RequestRefresh();
+		_snapshot = Orchestrator.GetSnapshot();
+		await InvokeAsync(StateHasChanged);
+	}
+
+	private async Task RefreshLoopAsync()
+	{
+		if (_timer is null)
+		{
+			return;
+		}
+
+		while (await _timer.WaitForNextTickAsync())
+		{
+			_snapshot = Orchestrator.GetSnapshot();
+			await InvokeAsync(StateHasChanged);
+		}
+	}
+}
